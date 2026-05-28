@@ -1,8 +1,10 @@
 data/db.json
+key/
 .tmp-test-data/
 .tmp-admin-test/
 .tmp-edit-test/
 .tmp-storage-test/
+.tmp-admin-reset-test/
 server.out.log
 server.err.log
 admin-test.out.log
@@ -11,3 +13,5 @@ edit-test.out.log
 edit-test.err.log
 storage-test.out.log
 storage-test.err.log
+admin-reset-test.out.log
+admin-reset-test.err.log

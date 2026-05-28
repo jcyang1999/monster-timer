@@ -132,6 +132,40 @@ input {
   flex: 1;
 }
 
+.user-admin-list {
+  display: grid;
+  gap: 10px;
+  max-height: 420px;
+  overflow: auto;
+}
+
+.user-admin-row {
+  display: grid;
+  grid-template-columns: minmax(110px, 1fr) 130px 88px;
+  gap: 8px;
+  align-items: center;
+  border: 1px solid var(--line);
+  padding: 10px;
+}
+
+.user-admin-name {
+  min-width: 0;
+}
+
+.user-admin-name strong,
+.user-admin-name span {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.user-admin-name span {
+  color: var(--muted);
+  font-size: 12px;
+  margin-top: 3px;
+}
+
 .error-text {
   min-height: 20px;
   margin: 0;
@@ -259,7 +293,7 @@ td.next-col {
 }
 
 .actions {
-  width: 310px;
+  width: 210px;
   display: flex;
   gap: 6px;
   flex-wrap: wrap;

@@ -512,6 +512,16 @@ async function requireUser(req, res) {
   return session.user;
 }
 
+async function requireAdmin(req, res) {
+  const user = await requireUser(req, res);
+  if (!user) return null;
+  if (!isAdmin(user)) {
+    sendJson(res, 403, { error: "只有管理员可以操作。" });
+    return null;
+  }
+  return user;
+}
+
 function cleanUsername(username) {
   return String(username || "").trim().replace(/\s+/g, " ");
 }
@@ -585,6 +595,45 @@ async function handleApi(req, res) {
       await storage.deleteSession(session.token);
     }
     res.setHeader("set-cookie", "mt_session=; HttpOnly; SameSite=Lax; Path=/; Max-Age=0");
+    sendJson(res, 200, { ok: true });
+    return;
+  }
+
+  if (req.method === "GET" && req.url === "/api/admin/users") {
+    if (!(await requireAdmin(req, res))) return;
+    const users = await storage.allUsers();
+    sendJson(res, 200, {
+      users: users
+        .map((user) => ({
+          id: user.id,
+          username: user.username,
+          isAdmin: isAdmin(user),
+          createdAt: user.createdAt,
+        }))
+        .sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt)),
+    });
+    return;
+  }
+
+  const adminPasswordMatch = req.url.match(/^\/api\/admin\/users\/([^/]+)\/password$/);
+  if (req.method === "POST" && adminPasswordMatch) {
+    if (!(await requireAdmin(req, res))) return;
+    const [, userId] = adminPasswordMatch;
+    const body = await readBody(req);
+    const password = String(body.password || "");
+    if (password.length < 6) {
+      sendJson(res, 400, { error: "密码至少 6 位。" });
+      return;
+    }
+    const user = await storage.findUserById(userId);
+    if (!user) {
+      sendJson(res, 404, { error: "找不到这个用户。" });
+      return;
+    }
+    const { salt, hash } = hashPassword(password);
+    user.salt = salt;
+    user.passwordHash = hash;
+    await storage.updateUser(user);
     sendJson(res, 200, { ok: true });
     return;
   }
@@ -710,36 +759,24 @@ async function handleApi(req, res) {
     }
 
     if (req.method === "POST" && action === "kill") {
-      await storage.createKillEvent({
-        id: newId("evt"),
-        monsterId: monster.id,
-        killerId: user.id,
-        killedAt: nowIso(),
-        createdAt: nowIso(),
-      });
-      await broadcastState();
-      sendJson(res, 201, { ok: true });
-      return;
-    }
-
-    if (req.method === "POST" && action === "shift") {
-      const body = await readBody(req);
-      const direction = body.direction === "next" ? 1 : body.direction === "previous" ? -1 : 0;
-      if (!direction) {
-        sendJson(res, 400, { error: "调整方向不正确。" });
-        return;
-      }
       const latest = await latestKillEvent(monster.id);
-      const baseTime = latest ? new Date(latest.killedAt) : new Date();
-      const shifted = new Date(baseTime.getTime() + direction * monster.respawnMinutes * 60_000);
-      await storage.createKillEvent({
-        id: newId("evt"),
-        monsterId: monster.id,
-        killerId: user.id,
-        killedAt: shifted.toISOString(),
-        createdAt: nowIso(),
-        note: direction === 1 ? "shift-next" : "shift-previous",
-      });
+      const killedAt = nowIso();
+      if (latest) {
+        latest.killedAt = killedAt;
+        latest.killerId = user.id;
+        latest.updatedAt = killedAt;
+        latest.updatedBy = user.id;
+        latest.note = "kill-overwrite";
+        await storage.updateKillEvent(latest);
+      } else {
+        await storage.createKillEvent({
+          id: newId("evt"),
+          monsterId: monster.id,
+          killerId: user.id,
+          killedAt,
+          createdAt: killedAt,
+        });
+      }
       await broadcastState();
       sendJson(res, 201, { ok: true });
       return;

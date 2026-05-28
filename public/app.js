@@ -12,6 +12,7 @@ const authForm = document.querySelector("#authForm");
 const authError = document.querySelector("#authError");
 const registerButton = document.querySelector("#registerButton");
 const logoutButton = document.querySelector("#logoutButton");
+const userAdminButton = document.querySelector("#userAdminButton");
 const currentUser = document.querySelector("#currentUser");
 const syncStatus = document.querySelector("#syncStatus");
 const addMonsterForm = document.querySelector("#addMonsterForm");
@@ -20,6 +21,9 @@ const emptyState = document.querySelector("#emptyState");
 const editDialog = document.querySelector("#editDialog");
 const editForm = document.querySelector("#editForm");
 const cancelEditButton = document.querySelector("#cancelEditButton");
+const userAdminDialog = document.querySelector("#userAdminDialog");
+const userAdminRows = document.querySelector("#userAdminRows");
+const closeUserAdminButton = document.querySelector("#closeUserAdminButton");
 
 function api(path, options = {}) {
   const headers = { ...(options.headers || {}) };
@@ -120,8 +124,6 @@ function renderRows() {
       <td class="interval">${formatInterval(monster.respawnMinutes)}</td>
       <td class="killer">${monster.latestKill ? monster.latestKill.killerName : "-"}</td>
       <td class="actions">
-        <button type="button" data-action="shiftPrevious">上一次</button>
-        <button type="button" data-action="shiftNext">下一次</button>
         <button type="button" class="primary" data-action="kill">击杀</button>
         <button type="button" data-action="edit">编辑</button>
         ${deleteButton}
@@ -156,13 +158,6 @@ async function handleMonsterAction(action, monster) {
       await api(`/api/monsters/${monster.id}/kill`, { method: "POST" });
       return;
     }
-    if (action === "shiftPrevious" || action === "shiftNext") {
-      await api(`/api/monsters/${monster.id}/shift`, {
-        method: "POST",
-        body: JSON.stringify({ direction: action === "shiftNext" ? "next" : "previous" }),
-      });
-      return;
-    }
     if (action === "edit") {
       document.querySelector("#editId").value = monster.id;
       document.querySelector("#editName").value = monster.name;
@@ -184,6 +179,7 @@ function showMain() {
   authView.hidden = true;
   mainView.hidden = false;
   currentUser.textContent = state.user ? `当前：${state.user.username}${state.user.isAdmin ? "（管理员）" : ""}` : "";
+  userAdminButton.hidden = !state.user?.isAdmin;
   startRealtime();
 }
 
@@ -191,7 +187,63 @@ function showAuth() {
   authView.hidden = false;
   mainView.hidden = true;
   currentUser.textContent = "";
+  userAdminButton.hidden = true;
   stopRealtime();
+}
+
+function formatDate(value) {
+  if (!value) return "-";
+  return new Intl.DateTimeFormat("zh-CN", {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).format(new Date(value));
+}
+
+async function openUserAdmin() {
+  try {
+    userAdminRows.textContent = "正在加载...";
+    userAdminDialog.showModal();
+    const payload = await api("/api/admin/users");
+    userAdminRows.innerHTML = "";
+    for (const user of payload.users) {
+      const row = document.createElement("div");
+      row.className = "user-admin-row";
+      row.innerHTML = `
+        <div class="user-admin-name">
+          <strong></strong>
+          <span></span>
+        </div>
+        <input type="password" minlength="6" placeholder="新密码" />
+        <button type="button">重置</button>
+      `;
+      row.querySelector("strong").textContent = `${user.username}${user.isAdmin ? "（管理员）" : ""}`;
+      row.querySelector("span").textContent = `注册：${formatDate(user.createdAt)}`;
+      const input = row.querySelector("input");
+      row.querySelector("button").addEventListener("click", async () => {
+        if (input.value.length < 6) {
+          alert("新密码至少 6 位。");
+          return;
+        }
+        await api(`/api/admin/users/${user.id}/password`, {
+          method: "POST",
+          body: JSON.stringify({ password: input.value }),
+        });
+        input.value = "";
+        alert("密码已重置。");
+      });
+      userAdminRows.appendChild(row);
+    }
+    if (payload.users.length === 0) {
+      userAdminRows.textContent = "暂无用户。";
+    }
+  } catch (error) {
+    alert(error.message);
+    userAdminDialog.close();
+  }
 }
 
 function startRealtime() {
@@ -271,6 +323,9 @@ logoutButton.addEventListener("click", async () => {
   state.user = null;
   showAuth();
 });
+
+userAdminButton.addEventListener("click", openUserAdmin);
+closeUserAdminButton.addEventListener("click", () => userAdminDialog.close());
 
 addMonsterForm.addEventListener("submit", async (event) => {
   event.preventDefault();
