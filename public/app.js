@@ -42,6 +42,19 @@ function formatClock(value) {
   }).format(new Date(value));
 }
 
+function formatDatetimeLocal(value) {
+  if (!value) return "";
+  const date = new Date(value);
+  const local = new Date(date.getTime() - date.getTimezoneOffset() * 60_000);
+  return local.toISOString().slice(0, 16);
+}
+
+function parseDatetimeLocal(value) {
+  if (!value) return null;
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date.toISOString();
+}
+
 function formatInterval(minutes) {
   const hours = Math.floor(minutes / 60);
   const rest = minutes % 60;
@@ -154,6 +167,7 @@ async function handleMonsterAction(action, monster) {
       document.querySelector("#editId").value = monster.id;
       document.querySelector("#editName").value = monster.name;
       document.querySelector("#editRespawn").value = monster.respawnMinutes;
+      document.querySelector("#editKilledAt").value = formatDatetimeLocal(monster.latestKill?.killedAt);
       editDialog.showModal();
       return;
     }
@@ -287,6 +301,7 @@ editForm.addEventListener("submit", async (event) => {
       body: JSON.stringify({
         name: document.querySelector("#editName").value,
         respawnMinutes: Number(document.querySelector("#editRespawn").value),
+        killedAt: parseDatetimeLocal(document.querySelector("#editKilledAt").value),
       }),
     });
     editDialog.close();

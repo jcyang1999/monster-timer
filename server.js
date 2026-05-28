@@ -100,6 +100,12 @@ function publicUser(user) {
   };
 }
 
+function latestKillEvent(monsterId) {
+  return db.killEvents
+    .filter((event) => event.monsterId === monsterId)
+    .sort((a, b) => new Date(b.killedAt) - new Date(a.killedAt))[0];
+}
+
 function sendJson(res, status, payload) {
   const body = JSON.stringify(payload);
   res.writeHead(status, {
@@ -333,6 +339,9 @@ async function handleApi(req, res) {
       const body = await readBody(req);
       const name = String(body.name || "").trim();
       const respawnMinutes = Number(body.respawnMinutes);
+      const killedAt = body.killedAt === null || body.killedAt === undefined || body.killedAt === ""
+        ? null
+        : new Date(body.killedAt);
       if (name.length < 1 || name.length > 30) {
         sendJson(res, 400, { error: "怪物名需要 1 到 30 个字符。" });
         return;
@@ -341,10 +350,33 @@ async function handleApi(req, res) {
         sendJson(res, 400, { error: "刷新间隔需要在 1 分钟到 30 天之间。" });
         return;
       }
+      if (killedAt && Number.isNaN(killedAt.getTime())) {
+        sendJson(res, 400, { error: "击杀时间不正确。" });
+        return;
+      }
       monster.name = name;
       monster.respawnMinutes = Math.round(respawnMinutes);
       monster.updatedAt = nowIso();
       monster.updatedBy = user.id;
+      if (killedAt) {
+        const latest = latestKillEvent(monster.id);
+        if (latest) {
+          latest.killedAt = killedAt.toISOString();
+          latest.killerId = user.id;
+          latest.updatedAt = nowIso();
+          latest.updatedBy = user.id;
+          latest.note = "manual-edit";
+        } else {
+          db.killEvents.push({
+            id: newId("evt"),
+            monsterId: monster.id,
+            killerId: user.id,
+            killedAt: killedAt.toISOString(),
+            createdAt: nowIso(),
+            note: "manual-edit",
+          });
+        }
+      }
       await saveDb();
       broadcastState();
       sendJson(res, 200, { ok: true });
@@ -385,9 +417,7 @@ async function handleApi(req, res) {
         sendJson(res, 400, { error: "调整方向不正确。" });
         return;
       }
-      const latest = db.killEvents
-        .filter((event) => event.monsterId === monster.id)
-        .sort((a, b) => new Date(b.killedAt) - new Date(a.killedAt))[0];
+      const latest = latestKillEvent(monster.id);
       const baseTime = latest ? new Date(latest.killedAt) : new Date();
       const shifted = new Date(baseTime.getTime() + direction * monster.respawnMinutes * 60_000);
       db.killEvents.push({
