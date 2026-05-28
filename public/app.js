@@ -86,6 +86,9 @@ function renderRows() {
     const times = calculateTimes(monster);
     const tr = document.createElement("tr");
     const statusClass = times.countdownMs === null ? "" : times.countdownMs <= 0 ? "ready" : times.countdownMs <= 10 * 60_000 ? "soon" : "";
+    const deleteButton = state.user?.isAdmin
+      ? '<button type="button" class="danger" data-action="delete">删除</button>'
+      : "";
     tr.innerHTML = `
       <td class="monster-name"></td>
       <td class="time-cell">
@@ -108,7 +111,7 @@ function renderRows() {
         <button type="button" data-action="shiftNext">下一次</button>
         <button type="button" class="primary" data-action="kill">击杀</button>
         <button type="button" data-action="edit">编辑</button>
-        <button type="button" class="danger" data-action="delete">删除</button>
+        ${deleteButton}
       </td>
     `;
     tr.querySelector(".monster-name").textContent = monster.name;
@@ -166,7 +169,7 @@ async function handleMonsterAction(action, monster) {
 function showMain() {
   authView.hidden = true;
   mainView.hidden = false;
-  currentUser.textContent = state.user ? `当前：${state.user.username}` : "";
+  currentUser.textContent = state.user ? `当前：${state.user.username}${state.user.isAdmin ? "（管理员）" : ""}` : "";
   startRealtime();
 }
 

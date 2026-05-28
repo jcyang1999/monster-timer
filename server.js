@@ -48,6 +48,12 @@ async function ensureDb() {
     if (error.code !== "ENOENT") throw error;
     await saveDb();
   }
+
+  if (db.users.length > 0 && !db.users.some((user) => user.isAdmin)) {
+    db.users[0].isAdmin = true;
+    db.users[0].adminSince = nowIso();
+    await saveDb();
+  }
 }
 
 async function saveDb() {
@@ -74,6 +80,24 @@ function getSession(req) {
   const user = db.users.find((item) => item.id === session.userId);
   if (!user) return null;
   return { token, user };
+}
+
+function isAdmin(user) {
+  if (!user) return false;
+  if (user.isAdmin) return true;
+  const configuredAdmins = String(process.env.ADMIN_USERNAMES || "")
+    .split(",")
+    .map((name) => name.trim().toLowerCase())
+    .filter(Boolean);
+  return configuredAdmins.includes(user.username.toLowerCase());
+}
+
+function publicUser(user) {
+  return {
+    id: user.id,
+    username: user.username,
+    isAdmin: isAdmin(user),
+  };
 }
 
 function sendJson(res, status, payload) {
@@ -179,7 +203,7 @@ async function handleApi(req, res) {
   if (req.method === "GET" && req.url === "/api/me") {
     const session = getSession(req);
     sendJson(res, 200, {
-      user: session ? { id: session.user.id, username: session.user.username } : null,
+      user: session ? publicUser(session.user) : null,
     });
     return;
   }
@@ -206,6 +230,7 @@ async function handleApi(req, res) {
       username,
       salt,
       passwordHash: hash,
+      isAdmin: db.users.length === 0,
       createdAt: nowIso(),
     };
     db.users.push(user);
@@ -213,7 +238,7 @@ async function handleApi(req, res) {
     db.sessions[token] = { userId: user.id, createdAt: nowIso() };
     await saveDb();
     res.setHeader("set-cookie", `mt_session=${encodeURIComponent(token)}; HttpOnly; SameSite=Lax; Path=/; Max-Age=2592000`);
-    sendJson(res, 201, { user: { id: user.id, username: user.username } });
+    sendJson(res, 201, { user: publicUser(user) });
     return;
   }
 
@@ -230,7 +255,7 @@ async function handleApi(req, res) {
     db.sessions[token] = { userId: user.id, createdAt: nowIso() };
     await saveDb();
     res.setHeader("set-cookie", `mt_session=${encodeURIComponent(token)}; HttpOnly; SameSite=Lax; Path=/; Max-Age=2592000`);
-    sendJson(res, 200, { user: { id: user.id, username: user.username } });
+    sendJson(res, 200, { user: publicUser(user) });
     return;
   }
 
@@ -327,6 +352,10 @@ async function handleApi(req, res) {
     }
 
     if (req.method === "DELETE" && !action) {
+      if (!isAdmin(user)) {
+        sendJson(res, 403, { error: "只有管理员可以删除怪物。" });
+        return;
+      }
       monster.deletedAt = nowIso();
       monster.deletedBy = user.id;
       await saveDb();
