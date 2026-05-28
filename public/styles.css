@@ -1,0 +1,318 @@
+:root {
+  color-scheme: light;
+  --bg: #f4f6f8;
+  --panel: #ffffff;
+  --line: #d8dde5;
+  --line-strong: #b5bfcc;
+  --text: #172033;
+  --muted: #657386;
+  --accent: #1e72d8;
+  --accent-dark: #1558ac;
+  --danger: #b42318;
+  --ready: #0f7b41;
+  --warning: #9a5b00;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+[hidden] {
+  display: none !important;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background: var(--bg);
+  color: var(--text);
+  font-family: "Microsoft YaHei", "Segoe UI", Arial, sans-serif;
+  font-size: 14px;
+}
+
+button,
+input {
+  font: inherit;
+}
+
+button {
+  min-height: 34px;
+  border: 1px solid var(--line-strong);
+  background: #f7f9fb;
+  color: var(--text);
+  cursor: pointer;
+}
+
+button:hover {
+  background: #eaf1f8;
+}
+
+button.primary,
+.auth-actions button:first-child,
+.add-form button,
+.dialog-actions button:last-child {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: #fff;
+}
+
+button.primary:hover,
+.auth-actions button:first-child:hover,
+.add-form button:hover,
+.dialog-actions button:last-child:hover {
+  background: var(--accent-dark);
+}
+
+button.danger {
+  border-color: #d8a6a1;
+  color: var(--danger);
+}
+
+input {
+  min-height: 34px;
+  border: 1px solid var(--line);
+  background: #fff;
+  color: var(--text);
+  padding: 6px 8px;
+}
+
+.app-shell {
+  min-height: 100vh;
+}
+
+.auth-view {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+}
+
+.auth-panel {
+  width: min(420px, 100%);
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 28px;
+  box-shadow: 0 16px 40px rgba(20, 35, 55, 0.08);
+}
+
+.auth-panel h1,
+.topbar h1 {
+  margin: 0;
+  font-size: 24px;
+}
+
+.auth-panel p,
+.topbar p {
+  margin: 8px 0 0;
+  color: var(--muted);
+}
+
+.auth-form {
+  display: grid;
+  gap: 14px;
+  margin-top: 24px;
+}
+
+.auth-form label,
+.edit-form label {
+  display: grid;
+  gap: 6px;
+  color: var(--muted);
+}
+
+.auth-actions,
+.dialog-actions {
+  display: flex;
+  gap: 10px;
+}
+
+.auth-actions button,
+.dialog-actions button {
+  flex: 1;
+}
+
+.error-text {
+  min-height: 20px;
+  margin: 0;
+  color: var(--danger);
+}
+
+.main-view {
+  width: min(1180px, calc(100% - 32px));
+  margin: 0 auto;
+  padding: 24px 0 40px;
+}
+
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 18px;
+}
+
+.user-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  white-space: nowrap;
+}
+
+.add-form {
+  display: grid;
+  grid-template-columns: minmax(180px, 1fr) 82px auto 82px auto 96px;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 16px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  padding: 12px;
+}
+
+.table-shell {
+  position: relative;
+  overflow-x: auto;
+  background: var(--panel);
+  border: 1px solid var(--line);
+}
+
+table {
+  width: 100%;
+  min-width: 920px;
+  border-collapse: collapse;
+}
+
+th,
+td {
+  border-bottom: 1px solid var(--line);
+  padding: 14px 10px;
+  text-align: left;
+  vertical-align: middle;
+}
+
+th {
+  color: var(--muted);
+  font-weight: 600;
+  background: #fbfcfe;
+}
+
+tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.monster-name {
+  width: 155px;
+  font-weight: 700;
+  font-size: 15px;
+}
+
+.time-cell {
+  width: 88px;
+  background: #fbfcfe;
+}
+
+.time-label {
+  display: block;
+  color: var(--muted);
+  font-size: 12px;
+  margin-bottom: 5px;
+}
+
+.time-value {
+  display: block;
+  font-weight: 700;
+  font-size: 15px;
+}
+
+.countdown {
+  display: block;
+  color: var(--muted);
+  font-size: 12px;
+  margin-top: 5px;
+}
+
+.next-col {
+  box-shadow: inset 4px 0 0 #ff5a5f, inset -4px 0 0 #ff5a5f;
+}
+
+td.next-col {
+  background: #fff;
+}
+
+.ready .countdown,
+.ready .time-value {
+  color: var(--ready);
+}
+
+.soon .countdown {
+  color: var(--warning);
+}
+
+.interval {
+  width: 74px;
+  font-weight: 700;
+}
+
+.killer {
+  width: 118px;
+}
+
+.actions {
+  width: 310px;
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.actions button {
+  min-width: 58px;
+}
+
+.empty-state {
+  padding: 28px;
+  color: var(--muted);
+  text-align: center;
+}
+
+dialog {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 0;
+  width: min(380px, calc(100% - 32px));
+}
+
+dialog::backdrop {
+  background: rgba(10, 20, 35, 0.35);
+}
+
+.edit-form {
+  display: grid;
+  gap: 14px;
+  padding: 22px;
+}
+
+.edit-form h2 {
+  margin: 0;
+  font-size: 20px;
+}
+
+@media (max-width: 720px) {
+  .main-view {
+    width: calc(100% - 20px);
+    padding-top: 14px;
+  }
+
+  .topbar {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .add-form {
+    grid-template-columns: 1fr 70px auto;
+  }
+
+  .add-form button {
+    grid-column: 1 / -1;
+  }
+}

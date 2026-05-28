@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>怪物刷新记录</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <main class="app-shell">
+      <section id="authView" class="auth-view">
+        <div class="auth-panel">
+          <h1>怪物刷新记录</h1>
+          <p>登录后共享击杀时间、刷新倒计时和击杀者。</p>
+          <form id="authForm" class="auth-form">
+            <label>
+              用户名
+              <input id="username" name="username" maxlength="20" autocomplete="username" required />
+            </label>
+            <label>
+              密码
+              <input id="password" name="password" type="password" minlength="6" autocomplete="current-password" required />
+            </label>
+            <div class="auth-actions">
+              <button type="submit" data-mode="login">登录</button>
+              <button type="button" id="registerButton">注册</button>
+            </div>
+            <p id="authError" class="error-text" aria-live="polite"></p>
+          </form>
+        </div>
+      </section>
+
+      <section id="mainView" class="main-view" hidden>
+        <header class="topbar">
+          <div>
+            <h1>怪物刷新记录</h1>
+            <p id="syncStatus">正在同步...</p>
+          </div>
+          <div class="user-bar">
+            <span id="currentUser"></span>
+            <button type="button" id="logoutButton">退出</button>
+          </div>
+        </header>
+
+        <form id="addMonsterForm" class="add-form">
+          <input id="monsterName" name="name" placeholder="怪物名称" maxlength="30" required />
+          <input id="respawnHours" name="hours" type="number" min="0" max="720" step="1" value="3" aria-label="小时" />
+          <span>小时</span>
+          <input id="respawnMinutes" name="minutes" type="number" min="0" max="59" step="1" value="0" aria-label="分钟" />
+          <span>分钟</span>
+          <button type="submit">新增</button>
+        </form>
+
+        <div class="table-shell">
+          <table>
+            <thead>
+              <tr>
+                <th>怪物</th>
+                <th>上次</th>
+                <th>击杀</th>
+                <th class="next-col">下次</th>
+                <th>间隔</th>
+                <th>击杀者</th>
+                <th>操作</th>
+              </tr>
+            </thead>
+            <tbody id="monsterRows"></tbody>
+          </table>
+          <div id="emptyState" class="empty-state" hidden>还没有怪物，先新增一行。</div>
+        </div>
+      </section>
+    </main>
+
+    <dialog id="editDialog">
+      <form id="editForm" method="dialog" class="edit-form">
+        <h2>编辑怪物</h2>
+        <input type="hidden" id="editId" />
+        <label>
+          怪物名称
+          <input id="editName" maxlength="30" required />
+        </label>
+        <label>
+          刷新间隔（分钟）
+          <input id="editRespawn" type="number" min="1" max="43200" required />
+        </label>
+        <div class="dialog-actions">
+          <button type="button" id="cancelEditButton">取消</button>
+          <button type="submit">保存</button>
+        </div>
+      </form>
+    </dialog>
+
+    <script src="/app.js"></script>
+  </body>
+</html>

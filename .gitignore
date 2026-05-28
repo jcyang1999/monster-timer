@@ -1,0 +1,4 @@
+data/db.json
+.tmp-test-data/
+server.out.log
+server.err.log

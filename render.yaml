@@ -1,0 +1,15 @@
+services:
+  - type: web
+    name: monster-timer
+    runtime: node
+    plan: starter
+    buildCommand: npm install --omit=dev
+    startCommand: npm start
+    healthCheckPath: /api/health
+    envVars:
+      - key: MONSTER_TIMER_DATA_DIR
+        value: /var/data
+    disk:
+      name: monster-timer-data
+      mountPath: /var/data
+      sizeGB: 1

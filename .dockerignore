@@ -1,0 +1,6 @@
+data/
+.tmp-test-data/
+server.out.log
+server.err.log
+node_modules/
+.git/
