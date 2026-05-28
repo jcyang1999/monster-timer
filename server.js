@@ -26,6 +26,9 @@ let db = {
 };
 
 const sseClients = new Set();
+const SUPABASE_URL = String(process.env.SUPABASE_URL || "").replace(/\/+$/, "");
+const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || "";
+const USE_SUPABASE = Boolean(SUPABASE_URL && SUPABASE_SERVICE_ROLE_KEY);
 
 function nowIso() {
   return new Date().toISOString();
@@ -35,7 +38,140 @@ function newId(prefix) {
   return `${prefix}_${crypto.randomBytes(10).toString("hex")}`;
 }
 
+function toUser(row) {
+  if (!row) return null;
+  return {
+    id: row.id,
+    username: row.username,
+    salt: row.salt,
+    passwordHash: row.password_hash,
+    isAdmin: row.is_admin,
+    adminSince: row.admin_since,
+    createdAt: row.created_at,
+  };
+}
+
+function fromUser(user) {
+  return {
+    id: user.id,
+    username: user.username,
+    salt: user.salt,
+    password_hash: user.passwordHash,
+    is_admin: Boolean(user.isAdmin),
+    admin_since: user.adminSince || null,
+    created_at: user.createdAt,
+  };
+}
+
+function toSession(row) {
+  if (!row) return null;
+  return {
+    token: row.token,
+    userId: row.user_id,
+    createdAt: row.created_at,
+  };
+}
+
+function fromSession(token, session) {
+  return {
+    token,
+    user_id: session.userId,
+    created_at: session.createdAt,
+  };
+}
+
+function toMonster(row) {
+  if (!row) return null;
+  return {
+    id: row.id,
+    name: row.name,
+    respawnMinutes: row.respawn_minutes,
+    order: row.order_value,
+    createdAt: row.created_at,
+    createdBy: row.created_by,
+    updatedAt: row.updated_at,
+    updatedBy: row.updated_by,
+    deletedAt: row.deleted_at,
+    deletedBy: row.deleted_by,
+  };
+}
+
+function fromMonster(monster) {
+  return {
+    id: monster.id,
+    name: monster.name,
+    respawn_minutes: monster.respawnMinutes,
+    order_value: monster.order,
+    created_at: monster.createdAt,
+    created_by: monster.createdBy,
+    updated_at: monster.updatedAt || null,
+    updated_by: monster.updatedBy || null,
+    deleted_at: monster.deletedAt || null,
+    deleted_by: monster.deletedBy || null,
+  };
+}
+
+function toKillEvent(row) {
+  if (!row) return null;
+  return {
+    id: row.id,
+    monsterId: row.monster_id,
+    killerId: row.killer_id,
+    killedAt: row.killed_at,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+    updatedBy: row.updated_by,
+    note: row.note,
+  };
+}
+
+function fromKillEvent(event) {
+  return {
+    id: event.id,
+    monster_id: event.monsterId,
+    killer_id: event.killerId,
+    killed_at: event.killedAt,
+    created_at: event.createdAt,
+    updated_at: event.updatedAt || null,
+    updated_by: event.updatedBy || null,
+    note: event.note || null,
+  };
+}
+
+async function supabaseRequest(table, params = {}, options = {}) {
+  const url = new URL(`${SUPABASE_URL}/rest/v1/${table}`);
+  for (const [key, value] of Object.entries(params)) {
+    url.searchParams.set(key, value);
+  }
+  const response = await fetch(url, {
+    method: options.method || "GET",
+    headers: {
+      apikey: SUPABASE_SERVICE_ROLE_KEY,
+      authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+      "content-type": "application/json",
+      ...(options.headers || {}),
+    },
+    body: options.body ? JSON.stringify(options.body) : undefined,
+  });
+  const text = await response.text();
+  if (!response.ok) {
+    throw new Error(`Supabase ${table} ${response.status}: ${text}`);
+  }
+  return text ? JSON.parse(text) : null;
+}
+
 async function ensureDb() {
+  if (USE_SUPABASE) {
+    const users = await storage.allUsers();
+    if (users.length > 0 && !users.some((user) => user.isAdmin)) {
+      const firstUser = users.sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt))[0];
+      firstUser.isAdmin = true;
+      firstUser.adminSince = nowIso();
+      await storage.updateUser(firstUser);
+    }
+    return;
+  }
+
   await fs.mkdir(DATA_DIR, { recursive: true });
   try {
     const raw = await fs.readFile(DB_FILE, "utf8");
@@ -57,9 +193,188 @@ async function ensureDb() {
 }
 
 async function saveDb() {
+  if (USE_SUPABASE) return;
   await fs.mkdir(DATA_DIR, { recursive: true });
   await fs.writeFile(DB_FILE, JSON.stringify(db, null, 2), "utf8");
 }
+
+const storage = {
+  async allUsers() {
+    if (USE_SUPABASE) {
+      const rows = await supabaseRequest("users", { select: "*" });
+      return rows.map(toUser);
+    }
+    return db.users;
+  },
+
+  async findUserById(id) {
+    if (USE_SUPABASE) {
+      const rows = await supabaseRequest("users", { select: "*", id: `eq.${id}`, limit: "1" });
+      return toUser(rows[0]);
+    }
+    return db.users.find((user) => user.id === id) || null;
+  },
+
+  async findUserByUsername(username) {
+    if (USE_SUPABASE) {
+      const rows = await supabaseRequest("users", { select: "*", username: `ilike.${username}`, limit: "1" });
+      return toUser(rows[0]);
+    }
+    return db.users.find((user) => user.username.toLowerCase() === username.toLowerCase()) || null;
+  },
+
+  async createUser(user) {
+    if (USE_SUPABASE) {
+      await supabaseRequest("users", {}, {
+        method: "POST",
+        headers: { prefer: "return=minimal" },
+        body: fromUser(user),
+      });
+      return;
+    }
+    db.users.push(user);
+    await saveDb();
+  },
+
+  async updateUser(user) {
+    if (USE_SUPABASE) {
+      await supabaseRequest("users", { id: `eq.${user.id}` }, {
+        method: "PATCH",
+        headers: { prefer: "return=minimal" },
+        body: fromUser(user),
+      });
+      return;
+    }
+    const index = db.users.findIndex((item) => item.id === user.id);
+    if (index >= 0) db.users[index] = user;
+    await saveDb();
+  },
+
+  async userCount() {
+    const users = await this.allUsers();
+    return users.length;
+  },
+
+  async createSession(token, session) {
+    if (USE_SUPABASE) {
+      await supabaseRequest("sessions", {}, {
+        method: "POST",
+        headers: { prefer: "return=minimal" },
+        body: fromSession(token, session),
+      });
+      return;
+    }
+    db.sessions[token] = session;
+    await saveDb();
+  },
+
+  async getSession(token) {
+    if (USE_SUPABASE) {
+      const rows = await supabaseRequest("sessions", { select: "*", token: `eq.${token}`, limit: "1" });
+      return toSession(rows[0]);
+    }
+    return db.sessions[token] || null;
+  },
+
+  async deleteSession(token) {
+    if (USE_SUPABASE) {
+      await supabaseRequest("sessions", { token: `eq.${token}` }, { method: "DELETE" });
+      return;
+    }
+    delete db.sessions[token];
+    await saveDb();
+  },
+
+  async allMonsters() {
+    if (USE_SUPABASE) {
+      const rows = await supabaseRequest("monsters", { select: "*" });
+      return rows.map(toMonster);
+    }
+    return db.monsters;
+  },
+
+  async findMonster(id) {
+    const monsters = await this.allMonsters();
+    return monsters.find((monster) => monster.id === id && !monster.deletedAt) || null;
+  },
+
+  async createMonster(monster) {
+    if (USE_SUPABASE) {
+      await supabaseRequest("monsters", {}, {
+        method: "POST",
+        headers: { prefer: "return=minimal" },
+        body: fromMonster(monster),
+      });
+      return;
+    }
+    db.monsters.push(monster);
+    await saveDb();
+  },
+
+  async updateMonster(monster) {
+    if (USE_SUPABASE) {
+      await supabaseRequest("monsters", { id: `eq.${monster.id}` }, {
+        method: "PATCH",
+        headers: { prefer: "return=minimal" },
+        body: fromMonster(monster),
+      });
+      return;
+    }
+    const index = db.monsters.findIndex((item) => item.id === monster.id);
+    if (index >= 0) db.monsters[index] = monster;
+    await saveDb();
+  },
+
+  async allKillEvents() {
+    if (USE_SUPABASE) {
+      const rows = await supabaseRequest("kill_events", { select: "*" });
+      return rows.map(toKillEvent);
+    }
+    return db.killEvents;
+  },
+
+  async latestKillEvent(monsterId) {
+    if (USE_SUPABASE) {
+      const rows = await supabaseRequest("kill_events", {
+        select: "*",
+        monster_id: `eq.${monsterId}`,
+        order: "killed_at.desc",
+        limit: "1",
+      });
+      return toKillEvent(rows[0]);
+    }
+    return db.killEvents
+      .filter((event) => event.monsterId === monsterId)
+      .sort((a, b) => new Date(b.killedAt) - new Date(a.killedAt))[0] || null;
+  },
+
+  async createKillEvent(event) {
+    if (USE_SUPABASE) {
+      await supabaseRequest("kill_events", {}, {
+        method: "POST",
+        headers: { prefer: "return=minimal" },
+        body: fromKillEvent(event),
+      });
+      return;
+    }
+    db.killEvents.push(event);
+    await saveDb();
+  },
+
+  async updateKillEvent(event) {
+    if (USE_SUPABASE) {
+      await supabaseRequest("kill_events", { id: `eq.${event.id}` }, {
+        method: "PATCH",
+        headers: { prefer: "return=minimal" },
+        body: fromKillEvent(event),
+      });
+      return;
+    }
+    const index = db.killEvents.findIndex((item) => item.id === event.id);
+    if (index >= 0) db.killEvents[index] = event;
+    await saveDb();
+  },
+};
 
 function parseCookies(req) {
   const header = req.headers.cookie || "";
@@ -72,12 +387,12 @@ function parseCookies(req) {
   return cookies;
 }
 
-function getSession(req) {
+async function getSession(req) {
   const token = parseCookies(req).mt_session;
   if (!token) return null;
-  const session = db.sessions[token];
+  const session = await storage.getSession(token);
   if (!session) return null;
-  const user = db.users.find((item) => item.id === session.userId);
+  const user = await storage.findUserById(session.userId);
   if (!user) return null;
   return { token, user };
 }
@@ -100,10 +415,8 @@ function publicUser(user) {
   };
 }
 
-function latestKillEvent(monsterId) {
-  return db.killEvents
-    .filter((event) => event.monsterId === monsterId)
-    .sort((a, b) => new Date(b.killedAt) - new Date(a.killedAt))[0];
+async function latestKillEvent(monsterId) {
+  return storage.latestKillEvent(monsterId);
 }
 
 function sendJson(res, status, payload) {
@@ -146,17 +459,20 @@ function verifyPassword(password, user) {
   return crypto.timingSafeEqual(Buffer.from(hash, "hex"), Buffer.from(user.passwordHash, "hex"));
 }
 
-function publicState() {
-  const usersById = new Map(db.users.map((user) => [user.id, user.username]));
+async function publicState() {
+  const users = await storage.allUsers();
+  const monsters = await storage.allMonsters();
+  const killEvents = await storage.allKillEvents();
+  const usersById = new Map(users.map((user) => [user.id, user.username]));
   const eventsByMonster = new Map();
-  for (const event of db.killEvents) {
+  for (const event of killEvents) {
     if (!eventsByMonster.has(event.monsterId)) eventsByMonster.set(event.monsterId, []);
     eventsByMonster.get(event.monsterId).push(event);
   }
 
   return {
     serverTime: nowIso(),
-    monsters: db.monsters
+    monsters: monsters
       .filter((monster) => !monster.deletedAt)
       .map((monster) => {
         const events = (eventsByMonster.get(monster.id) || [])
@@ -180,15 +496,15 @@ function publicState() {
   };
 }
 
-function broadcastState() {
-  const message = `event: state\ndata: ${JSON.stringify(publicState())}\n\n`;
+async function broadcastState() {
+  const message = `event: state\ndata: ${JSON.stringify(await publicState())}\n\n`;
   for (const client of sseClients) {
     client.write(message);
   }
 }
 
-function requireUser(req, res) {
-  const session = getSession(req);
+async function requireUser(req, res) {
+  const session = await getSession(req);
   if (!session) {
     sendJson(res, 401, { error: "请先登录。" });
     return null;
@@ -207,7 +523,7 @@ async function handleApi(req, res) {
   }
 
   if (req.method === "GET" && req.url === "/api/me") {
-    const session = getSession(req);
+    const session = await getSession(req);
     sendJson(res, 200, {
       user: session ? publicUser(session.user) : null,
     });
@@ -226,7 +542,7 @@ async function handleApi(req, res) {
       sendJson(res, 400, { error: "密码至少 6 位。" });
       return;
     }
-    if (db.users.some((user) => user.username.toLowerCase() === username.toLowerCase())) {
+    if (await storage.findUserByUsername(username)) {
       sendJson(res, 409, { error: "这个用户名已经被注册。" });
       return;
     }
@@ -236,13 +552,12 @@ async function handleApi(req, res) {
       username,
       salt,
       passwordHash: hash,
-      isAdmin: db.users.length === 0,
+      isAdmin: (await storage.userCount()) === 0,
       createdAt: nowIso(),
     };
-    db.users.push(user);
     const token = newId("ses");
-    db.sessions[token] = { userId: user.id, createdAt: nowIso() };
-    await saveDb();
+    await storage.createUser(user);
+    await storage.createSession(token, { userId: user.id, createdAt: nowIso() });
     res.setHeader("set-cookie", `mt_session=${encodeURIComponent(token)}; HttpOnly; SameSite=Lax; Path=/; Max-Age=2592000`);
     sendJson(res, 201, { user: publicUser(user) });
     return;
@@ -252,24 +567,22 @@ async function handleApi(req, res) {
     const body = await readBody(req);
     const username = cleanUsername(body.username);
     const password = String(body.password || "");
-    const user = db.users.find((item) => item.username.toLowerCase() === username.toLowerCase());
+    const user = await storage.findUserByUsername(username);
     if (!user || !verifyPassword(password, user)) {
       sendJson(res, 401, { error: "用户名或密码不正确。" });
       return;
     }
     const token = newId("ses");
-    db.sessions[token] = { userId: user.id, createdAt: nowIso() };
-    await saveDb();
+    await storage.createSession(token, { userId: user.id, createdAt: nowIso() });
     res.setHeader("set-cookie", `mt_session=${encodeURIComponent(token)}; HttpOnly; SameSite=Lax; Path=/; Max-Age=2592000`);
     sendJson(res, 200, { user: publicUser(user) });
     return;
   }
 
   if (req.method === "POST" && req.url === "/api/logout") {
-    const session = getSession(req);
+    const session = await getSession(req);
     if (session) {
-      delete db.sessions[session.token];
-      await saveDb();
+      await storage.deleteSession(session.token);
     }
     res.setHeader("set-cookie", "mt_session=; HttpOnly; SameSite=Lax; Path=/; Max-Age=0");
     sendJson(res, 200, { ok: true });
@@ -277,27 +590,27 @@ async function handleApi(req, res) {
   }
 
   if (req.method === "GET" && req.url === "/api/state") {
-    if (!requireUser(req, res)) return;
-    sendJson(res, 200, publicState());
+    if (!(await requireUser(req, res))) return;
+    sendJson(res, 200, await publicState());
     return;
   }
 
   if (req.method === "GET" && req.url === "/api/events") {
-    if (!requireUser(req, res)) return;
+    if (!(await requireUser(req, res))) return;
     res.writeHead(200, {
       "content-type": "text/event-stream; charset=utf-8",
       "cache-control": "no-cache, no-transform",
       connection: "keep-alive",
       "x-accel-buffering": "no",
     });
-    res.write(`event: state\ndata: ${JSON.stringify(publicState())}\n\n`);
+    res.write(`event: state\ndata: ${JSON.stringify(await publicState())}\n\n`);
     sseClients.add(res);
     req.on("close", () => sseClients.delete(res));
     return;
   }
 
   if (req.method === "POST" && req.url === "/api/monsters") {
-    const user = requireUser(req, res);
+    const user = await requireUser(req, res);
     if (!user) return;
     const body = await readBody(req);
     const name = String(body.name || "").trim();
@@ -310,7 +623,7 @@ async function handleApi(req, res) {
       sendJson(res, 400, { error: "刷新间隔需要在 1 分钟到 30 天之间。" });
       return;
     }
-    db.monsters.push({
+    await storage.createMonster({
       id: newId("mon"),
       name,
       respawnMinutes: Math.round(respawnMinutes),
@@ -318,18 +631,17 @@ async function handleApi(req, res) {
       createdAt: nowIso(),
       createdBy: user.id,
     });
-    await saveDb();
-    broadcastState();
+    await broadcastState();
     sendJson(res, 201, { ok: true });
     return;
   }
 
   const monsterMatch = req.url.match(/^\/api\/monsters\/([^/]+)(?:\/([^/]+))?$/);
   if (monsterMatch) {
-    const user = requireUser(req, res);
+    const user = await requireUser(req, res);
     if (!user) return;
     const [, monsterId, action] = monsterMatch;
-    const monster = db.monsters.find((item) => item.id === monsterId && !item.deletedAt);
+    const monster = await storage.findMonster(monsterId);
     if (!monster) {
       sendJson(res, 404, { error: "找不到这个怪物。" });
       return;
@@ -359,15 +671,16 @@ async function handleApi(req, res) {
       monster.updatedAt = nowIso();
       monster.updatedBy = user.id;
       if (killedAt) {
-        const latest = latestKillEvent(monster.id);
+        const latest = await latestKillEvent(monster.id);
         if (latest) {
           latest.killedAt = killedAt.toISOString();
           latest.killerId = user.id;
           latest.updatedAt = nowIso();
           latest.updatedBy = user.id;
           latest.note = "manual-edit";
+          await storage.updateKillEvent(latest);
         } else {
-          db.killEvents.push({
+          await storage.createKillEvent({
             id: newId("evt"),
             monsterId: monster.id,
             killerId: user.id,
@@ -377,8 +690,8 @@ async function handleApi(req, res) {
           });
         }
       }
-      await saveDb();
-      broadcastState();
+      await storage.updateMonster(monster);
+      await broadcastState();
       sendJson(res, 200, { ok: true });
       return;
     }
@@ -390,22 +703,21 @@ async function handleApi(req, res) {
       }
       monster.deletedAt = nowIso();
       monster.deletedBy = user.id;
-      await saveDb();
-      broadcastState();
+      await storage.updateMonster(monster);
+      await broadcastState();
       sendJson(res, 200, { ok: true });
       return;
     }
 
     if (req.method === "POST" && action === "kill") {
-      db.killEvents.push({
+      await storage.createKillEvent({
         id: newId("evt"),
         monsterId: monster.id,
         killerId: user.id,
         killedAt: nowIso(),
         createdAt: nowIso(),
       });
-      await saveDb();
-      broadcastState();
+      await broadcastState();
       sendJson(res, 201, { ok: true });
       return;
     }
@@ -417,10 +729,10 @@ async function handleApi(req, res) {
         sendJson(res, 400, { error: "调整方向不正确。" });
         return;
       }
-      const latest = latestKillEvent(monster.id);
+      const latest = await latestKillEvent(monster.id);
       const baseTime = latest ? new Date(latest.killedAt) : new Date();
       const shifted = new Date(baseTime.getTime() + direction * monster.respawnMinutes * 60_000);
-      db.killEvents.push({
+      await storage.createKillEvent({
         id: newId("evt"),
         monsterId: monster.id,
         killerId: user.id,
@@ -428,8 +740,7 @@ async function handleApi(req, res) {
         createdAt: nowIso(),
         note: direction === 1 ? "shift-next" : "shift-previous",
       });
-      await saveDb();
-      broadcastState();
+      await broadcastState();
       sendJson(res, 201, { ok: true });
       return;
     }

@@ -2,9 +2,12 @@ data/db.json
 .tmp-test-data/
 .tmp-admin-test/
 .tmp-edit-test/
+.tmp-storage-test/
 server.out.log
 server.err.log
 admin-test.out.log
 admin-test.err.log
 edit-test.out.log
 edit-test.err.log
+storage-test.out.log
+storage-test.err.log

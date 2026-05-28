@@ -17,7 +17,18 @@
 
 仓库里已经放了 `render.yaml`，支持 Render Blueprint 创建。
 
-注意：免费试用版本可以先上线，但账号、怪物和击杀记录保存在云服务的临时文件系统里，重启、重新部署或平台回收实例时可能丢失。
+免费长期保存数据：
+
+1. 创建 Supabase 免费项目。
+2. 打开 Supabase SQL Editor。
+3. 复制并运行 `supabase/schema.sql`。
+4. 在 Supabase Project Settings -> API 里复制 Project URL 和 service_role key。
+5. 在 Render 的 Web Service -> Environment 中添加：
+   - `SUPABASE_URL`
+   - `SUPABASE_SERVICE_ROLE_KEY`
+6. 保存后重新部署 Render。
+
+注意：不配置 Supabase 时，账号、怪物和击杀记录会保存在 Render 免费服务的临时文件系统里，重启、重新部署或平台回收实例时可能丢失。
 
 正式长期使用流程：
 
