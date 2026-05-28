@@ -6,19 +6,25 @@
 
 适合长期使用。电脑关机后，别人仍然可以访问。
 
-推荐流程：
+免费试用流程：
 
 1. 把本目录提交到 GitHub。
 2. 在 Render 创建 Web Service，连接这个 GitHub 仓库。
 3. Build Command 使用 `npm install --omit=dev`。
 4. Start Command 使用 `npm start`。
-5. 设置环境变量 `MONSTER_TIMER_DATA_DIR=/var/data`。
-6. 添加 Persistent Disk，挂载路径 `/var/data`，这样账号和击杀记录不会因为重启丢失。
-7. 部署完成后，Render 会给一个固定网址，例如 `https://xxx.onrender.com`。
+5. 免费试用时不要添加 Persistent Disk。
+6. 部署完成后，Render 会给一个固定网址，例如 `https://xxx.onrender.com`。
 
 仓库里已经放了 `render.yaml`，支持 Render Blueprint 创建。
 
-注意：需要持久磁盘的云部署通常不是永久免费；如果不用持久磁盘，重新部署后数据可能丢失。
+注意：免费试用版本可以先上线，但账号、怪物和击杀记录保存在云服务的临时文件系统里，重启、重新部署或平台回收实例时可能丢失。
+
+正式长期使用流程：
+
+1. 升级到支持 Persistent Disk 的付费实例。
+2. 添加 Persistent Disk，挂载路径 `/var/data`。
+3. 设置环境变量 `MONSTER_TIMER_DATA_DIR=/var/data`。
+4. 重新部署服务。
 
 ## 方案 B：继续跑在自己电脑，用 Cloudflare Tunnel 固定域名
 

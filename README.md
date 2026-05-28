@@ -22,8 +22,8 @@ http://localhost:3000
 2. 在 Render 创建 Web Service 或 Blueprint。
 3. Build Command: `npm install --omit=dev`
 4. Start Command: `npm start`
-5. Environment Variable: `MONSTER_TIMER_DATA_DIR=/var/data`
-6. 添加 Persistent Disk，Mount Path: `/var/data`
+5. 免费试用时不用添加 Persistent Disk。
+6. 长期正式使用时，建议升级到付费实例并添加 Persistent Disk，Mount Path: `/var/data`，再设置 `MONSTER_TIMER_DATA_DIR=/var/data`。
 
 部署完成后，Render 会给你固定网址，例如：
 
